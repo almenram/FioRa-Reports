@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Base de datos
+*.db
+*.sqlite
+*.sqlite3
+
+# Excel
+*.xlsx
+*.xls
+*.xlsm
+*.xlsb
+
+# PyInstaller
+build/
+dist/
+
+# Archivos de configuración generados
+*.spec
