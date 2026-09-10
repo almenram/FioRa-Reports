@@ -1,4 +1,3 @@
-
 from exportar import exportar_excel
 
 from database import Base, engine
@@ -793,17 +792,18 @@ class App(tk.Tk):
 
         lideres = reportes.obtener_lideres()
 
+        self.lideres_reporte = lideres
+
         self.lider_reporte = ttk.Combobox(
             self.frame_epp,
             values=lideres,
-            state="readonly",
             width=47
         )
 
         self.lider_reporte.grid(
             row=0,
             column=1,
-            padx=10,
+            padx=(43,10),
             pady=10
         )
 
@@ -812,10 +812,17 @@ class App(tk.Tk):
             self.actualizar_solicitantes
         )
 
-        tk.Label(
+        self.lider_reporte.bind(
+            "<KeyRelease>",
+            self.buscar_lider_reporte
+        )
+
+        self.label_solicitante = tk.Label(
             self.frame_epp,
             text="Solicitante:"
-        ).grid(
+        )
+
+        self.label_solicitante.grid(
             row=1,
             column=0,
             sticky="e",
@@ -825,7 +832,6 @@ class App(tk.Tk):
 
         self.solicitante_reporte = ttk.Combobox(
             self.frame_epp,
-            state="readonly",
             width=47
         )
 
@@ -834,6 +840,11 @@ class App(tk.Tk):
             column=1,
             padx=10,
             pady=10
+        )
+
+        self.solicitante_reporte.bind(
+            "<KeyRelease>",
+            self.buscar_solicitante_reporte
         )
 
         # -----------------------------------------------------
@@ -896,8 +907,10 @@ class App(tk.Tk):
             padx=5
         )
 
-        # EPP empieza oculto hasta seleccionar material
-        self.frame_epp.grid_remove()
+        # El líder siempre está visible.
+        # El solicitante comienza oculto y solo aparece para EPP.
+        self.label_solicitante.grid_remove()
+        self.solicitante_reporte.grid_remove()
 
     # =========================================================
     # SELECCIONAR MATERIAL
@@ -960,16 +973,13 @@ class App(tk.Tk):
             state="readonly"
         )
 
-        # EPP
+        # SOLICITANTE: solo aplica para EPP
         if material.categoria == "EPP":
-
-            self.frame_epp.grid()
-
+            self.label_solicitante.grid()
+            self.solicitante_reporte.grid()
         else:
-
-            self.frame_epp.grid_remove()
-
-            self.lider_reporte.set("")
+            self.label_solicitante.grid_remove()
+            self.solicitante_reporte.grid_remove()
             self.solicitante_reporte.set("")
 
     # =========================================================
@@ -996,10 +1006,43 @@ class App(tk.Tk):
             )
 
         # Actualizar opciones del desplegable
-        self.material_descripcion_reporte["values"] = [
-            material.descripcion
-            for material in resultados
-        ]
+        valores = [material.descripcion for material in resultados]
+        self.material_descripcion_reporte["values"] = valores
+
+        if valores and texto:
+            self.material_descripcion_reporte.after_idle(
+                lambda: self.material_descripcion_reporte.tk.call(
+                    "ttk::combobox::Post",
+                    self.material_descripcion_reporte._w
+                )
+            )
+
+    # =========================================================
+    # AUTOCOMPLETE LÍDER
+    # =========================================================
+
+    def buscar_lider_reporte(self, event=None):
+
+        texto = self.lider_reporte.get().strip().lower()
+
+        if not texto:
+            resultados = self.lideres_reporte
+        else:
+            resultados = [
+                lider
+                for lider in self.lideres_reporte
+                if texto in lider.lower()
+            ]
+
+        self.lider_reporte["values"] = resultados
+
+        if resultados and texto:
+            self.lider_reporte.after_idle(
+                lambda: self.lider_reporte.tk.call(
+                    "ttk::combobox::Post",
+                    self.lider_reporte._w
+                )
+            )
 
     # =========================================================
     # FILTRAR SOLICITANTES POR LÍDER
@@ -1018,9 +1061,37 @@ class App(tk.Tk):
             )
         )
 
+        self.solicitantes_reporte = solicitantes
         self.solicitante_reporte["values"] = solicitantes
-
         self.solicitante_reporte.set("")
+
+    # =========================================================
+    # AUTOCOMPLETE SOLICITANTE
+    # =========================================================
+
+    def buscar_solicitante_reporte(self, event=None):
+
+        texto = self.solicitante_reporte.get().strip().lower()
+        solicitantes = getattr(self, "solicitantes_reporte", [])
+
+        if not texto:
+            resultados = solicitantes
+        else:
+            resultados = [
+                solicitante
+                for solicitante in solicitantes
+                if texto in solicitante.lower()
+            ]
+
+        self.solicitante_reporte["values"] = resultados
+
+        if resultados and texto:
+            self.solicitante_reporte.after_idle(
+                lambda: self.solicitante_reporte.tk.call(
+                    "ttk::combobox::Post",
+                    self.solicitante_reporte._w
+                )
+            )
 
     # =========================================================
     # CREAR REPORTE
