@@ -1034,6 +1034,7 @@ class App(tk.Tk):
         fabricacion = self.fabricacion_entry.get().strip()
 
         solicitante = None
+        lider = self.lider_reporte.get()
 
         # -----------------------------------------------------
         # VALIDACIONES GENERALES
@@ -1086,22 +1087,25 @@ class App(tk.Tk):
             return
 
         # -----------------------------------------------------
+        # VALIDACIÓN DE LÍDER
+        # -----------------------------------------------------
+
+        if not lider:
+
+            messagebox.showwarning(
+                "Líder",
+                "Selecciona un líder."
+            )
+
+            return
+
+        # -----------------------------------------------------
         # VALIDACIONES EPP
         # -----------------------------------------------------
 
         if categoria == "EPP":
 
-            lider = self.lider_reporte.get()
             solicitante = self.solicitante_reporte.get()
-
-            if not lider:
-
-                messagebox.showwarning(
-                    "Líder",
-                    "Selecciona un líder."
-                )
-
-                return
 
             if not solicitante:
 
@@ -1122,6 +1126,7 @@ class App(tk.Tk):
                 codigo,
                 cantidad,
                 solicitante,
+                lider,
                 fabricacion
             )
 
@@ -1196,9 +1201,15 @@ class App(tk.Tk):
             pady=5
         )
 
-        self.filtro_codigo = ttk.Entry(
+        self.materiales_filtro_codigo = reportes.obtener_materiales()
+
+        self.filtro_codigo = ttk.Combobox(
             filtros,
-            width=20
+            values=[
+                f"{material.codigo} - {material.descripcion}"
+                for material in self.materiales_filtro_codigo
+            ],
+            width=35
         )
 
         self.filtro_codigo.grid(
@@ -1206,6 +1217,16 @@ class App(tk.Tk):
             column=1,
             padx=5,
             pady=5
+        )
+
+        self.filtro_codigo.bind(
+            "<KeyRelease>",
+            self.autocompletar_codigo_reporte
+        )
+
+        self.filtro_codigo.bind(
+            "<<ComboboxSelected>>",
+            self.seleccionar_codigo_reporte
         )
 
         tk.Label(
@@ -1414,6 +1435,38 @@ class App(tk.Tk):
             side="left",
             padx=5
         )
+
+    def autocompletar_codigo_reporte(self, event=None):
+
+        texto = self.filtro_codigo.get().strip().lower()
+
+        if not texto:
+            resultados = self.materiales_filtro_codigo
+        else:
+            resultados = [
+                material
+                for material in self.materiales_filtro_codigo
+                if (
+                    texto in material.codigo.lower()
+                    or texto in material.descripcion.lower()
+                )
+            ]
+
+        self.filtro_codigo["values"] = [
+            f"{material.codigo} - {material.descripcion}"
+            for material in resultados
+        ]
+
+
+    def seleccionar_codigo_reporte(self, event=None):
+
+        texto = self.filtro_codigo.get().strip()
+
+        if " - " in texto:
+            codigo = texto.split(" - ", 1)[0].strip()
+
+            self.filtro_codigo.set(codigo)
+
 
     def buscar_reportes(self):
 

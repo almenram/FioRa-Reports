@@ -313,17 +313,17 @@ def obtener_registros(
 
         if codigo:
             consulta = consulta.filter(
-                Registro.codigo == codigo
+                Registro.codigo.ilike(f"%{codigo}%")
             )
 
         if solicitante:
             consulta = consulta.filter(
-                Registro.solicitante == solicitante
+                Registro.solicitante.ilike(f"%{solicitante}%")
             )
 
         if lider:
             consulta = consulta.filter(
-                Registro.lider == lider
+                Registro.lider.ilike(f"%{lider}%")
             )
 
         if fabricacion:
