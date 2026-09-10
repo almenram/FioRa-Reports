@@ -1,3 +1,4 @@
+
 from exportar import exportar_excel
 
 from database import Base, engine
@@ -23,9 +24,6 @@ class App(tk.Tk):
 
         # Materiales cargados para el formulario
         self.materiales = []
-        self.modo_edicion_material = False
-        self.modo_edicion_reporte = False
-        self.reporte_editando_id = None
 
         self.crear_interfaz()
 
@@ -41,7 +39,7 @@ class App(tk.Tk):
 
         tk.Label(
             menu,
-            text="SISTEMA DE\nREPORTES",
+            text="REPORTES",
             font=("Arial", 18, "bold")
         ).pack(pady=30)
 
@@ -133,7 +131,6 @@ class App(tk.Tk):
 
         self.limpiar_contenido()
         self.configurar_enter(self.guardar_material)
-        self.modo_edicion_material = False
 
         tk.Label(
             self.contenido,
@@ -144,66 +141,152 @@ class App(tk.Tk):
         formulario = tk.Frame(self.contenido)
         formulario.pack()
 
-        tk.Label(formulario, text="Código:").grid(
-            row=0, column=0, sticky="e", padx=10, pady=10
+        tk.Label(
+            formulario,
+            text="Código:"
+        ).grid(
+            row=0,
+            column=0,
+            sticky="e",
+            padx=10,
+            pady=10
         )
 
-        self.material_codigo = ttk.Entry(formulario, width=40)
-        self.material_codigo.grid(row=0, column=1, padx=10, pady=10)
-
-        tk.Label(formulario, text="Descripción:").grid(
-            row=1, column=0, sticky="e", padx=10, pady=10
+        self.material_codigo = ttk.Entry(
+            formulario,
+            width=40
         )
 
-        self.material_descripcion = ttk.Entry(formulario, width=40)
-        self.material_descripcion.grid(row=1, column=1, padx=10, pady=10)
-
-        tk.Label(formulario, text="Categoría:").grid(
-            row=2, column=0, sticky="e", padx=10, pady=10
+        self.material_codigo.grid(
+            row=0,
+            column=1,
+            padx=10,
+            pady=10
         )
 
-        categorias = reportes.obtener_categorias()
+        tk.Label(
+            formulario,
+            text="Descripción:"
+        ).grid(
+            row=1,
+            column=0,
+            sticky="e",
+            padx=10,
+            pady=10
+        )
+
+        self.material_descripcion = ttk.Entry(
+            formulario,
+            width=40
+        )
+
+        self.material_descripcion.grid(
+            row=1,
+            column=1,
+            padx=10,
+            pady=10
+        )
+
+        tk.Label(
+            formulario,
+            text="Categoría:"
+        ).grid(
+            row=2,
+            column=0,
+            sticky="e",
+            padx=10,
+            pady=10
+        )
+
         self.material_categoria = ttk.Combobox(
             formulario,
-            values=categorias,
-            state="normal",
+            values=[
+                "EPP",
+                "DISCOS",
+                "SOLDADURA"
+            ],
+            state="readonly",
             width=37
         )
-        self.material_categoria.grid(row=2, column=1, padx=10, pady=10)
-        self.material_categoria.set("EPP")
+
+        self.material_categoria.grid(
+            row=2,
+            column=1,
+            padx=10,
+            pady=10
+        )
+
+        self.material_categoria.current(0)
 
         botones = tk.Frame(formulario)
-        botones.grid(row=3, column=0, columnspan=2, pady=20)
-
-        self.boton_guardar_material = ttk.Button(
-            botones,
-            text="Guardar",
-            command=self.guardar_material
+        botones.grid(
+            row=3,
+            column=0,
+            columnspan=2,
+            pady=20
         )
-        self.boton_guardar_material.pack(side="left", padx=5)
 
         ttk.Button(
             botones,
-            text="Limpiar",
-            command=self.limpiar_formulario_material
-        ).pack(side="left", padx=5)
+            text="Guardar",
+            command=self.guardar_material
+        ).pack(
+            side="left",
+            padx=5
+        )
 
         ttk.Button(
             botones,
             text="Cancelar",
             command=self.mostrar_inicio
-        ).pack(side="left", padx=5)
+        ).pack(
+            side="left",
+            padx=5
+        )
 
         tk.Label(
             self.contenido,
             text="Materiales registrados",
             font=("Arial", 14, "bold")
-        ).pack(pady=(20, 10))
+        ).pack(
+            pady=(20, 10)
+        )
+
+        # =========================
+        # BÚSQUEDA DE MATERIALES
+        # =========================
+
+        busqueda_frame = ttk.Frame(self.contenido)
+        busqueda_frame.pack(pady=(0, 10))
+
+        ttk.Label(
+            busqueda_frame,
+            text="Buscar:"
+        ).pack(side="left", padx=5)
+
+        self.busqueda_materiales = ttk.Entry(
+            busqueda_frame,
+            width=45
+        )
+        self.busqueda_materiales.pack(side="left", padx=5)
+        self.busqueda_materiales.bind(
+            "<KeyRelease>",
+            self.filtrar_materiales
+        )
 
         tabla_frame = tk.Frame(self.contenido)
-        tabla_frame.pack(fill="both", expand=True, padx=30, pady=10)
+        tabla_frame.pack(
+            fill="both",
+            expand=True,
+            padx=30,
+            pady=10
+        )
 
-        columnas = ("codigo", "descripcion", "categoria")
+        columnas = (
+            "codigo",
+            "descripcion",
+            "categoria"
+        )
 
         self.tabla_materiales = ttk.Treeview(
             tabla_frame,
@@ -211,23 +294,34 @@ class App(tk.Tk):
             show="headings"
         )
 
-        encabezados = {
-            "codigo": "Código",
-            "descripcion": "Descripción",
-            "categoria": "Categoría"
-        }
+        self.tabla_materiales.heading(
+            "codigo",
+            text="Código"
+        )
 
-        for columna in columnas:
-            self.tabla_materiales.heading(
-                columna, text=encabezados[columna]
-            )
+        self.tabla_materiales.heading(
+            "descripcion",
+            text="Descripción"
+        )
 
-        self.tabla_materiales.column("codigo", width=150)
-        self.tabla_materiales.column("descripcion", width=400)
-        self.tabla_materiales.column("categoria", width=150)
+        self.tabla_materiales.heading(
+            "categoria",
+            text="Categoría"
+        )
 
-        self.tabla_materiales.bind(
-            "<Double-1>", self.editar_material_seleccionado
+        self.tabla_materiales.column(
+            "codigo",
+            width=150
+        )
+
+        self.tabla_materiales.column(
+            "descripcion",
+            width=400
+        )
+
+        self.tabla_materiales.column(
+            "categoria",
+            width=150
         )
 
         scrollbar = ttk.Scrollbar(
@@ -235,98 +329,92 @@ class App(tk.Tk):
             orient="vertical",
             command=self.tabla_materiales.yview
         )
-        self.tabla_materiales.configure(yscrollcommand=scrollbar.set)
 
-        self.tabla_materiales.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+        self.tabla_materiales.configure(
+            yscrollcommand=scrollbar.set
+        )
 
-        ttk.Button(
-            self.contenido,
-            text="Editar material seleccionado",
-            command=self.editar_material_seleccionado
-        ).pack(pady=(0, 15))
+        self.tabla_materiales.pack(
+            side="left",
+            fill="both",
+            expand=True
+        )
+
+        scrollbar.pack(
+            side="right",
+            fill="y"
+        )
 
         self.cargar_materiales()
 
-    def limpiar_formulario_material(self):
-        self.modo_edicion_material = False
-        self.material_codigo.config(state="normal")
-        self.material_codigo.delete(0, tk.END)
-        self.material_descripcion.delete(0, tk.END)
-        self.material_categoria.set("EPP")
-        self.boton_guardar_material.config(text="Guardar")
-
-    def editar_material_seleccionado(self, event=None):
-        seleccion = self.tabla_materiales.selection()
-
-        if not seleccion:
-            if event is not None:
-                return
-            messagebox.showwarning(
-                "Material",
-                "Selecciona un material de la tabla."
-            )
-            return
-
-        valores = self.tabla_materiales.item(seleccion[0], "values")
-
-        self.modo_edicion_material = True
-
-        self.material_codigo.config(state="normal")
-        self.material_codigo.delete(0, tk.END)
-        self.material_codigo.insert(0, valores[0])
-        self.material_codigo.config(state="readonly")
-
-        self.material_descripcion.delete(0, tk.END)
-        self.material_descripcion.insert(0, valores[1])
-
-        self.material_categoria.set(valores[2])
-        self.boton_guardar_material.config(text="Actualizar")
-
     def guardar_material(self):
+
         codigo = self.material_codigo.get().strip()
         descripcion = self.material_descripcion.get().strip()
-        categoria = self.material_categoria.get().strip()
+        categoria = self.material_categoria.get()
 
         if not codigo or not descripcion or not categoria:
+
             messagebox.showwarning(
                 "Campos incompletos",
                 "Completa todos los campos."
             )
+
             return
 
         try:
-            if self.modo_edicion_material:
-                reportes.actualizar_material(
-                    codigo,
-                    descripcion,
-                    categoria
-                )
-                mensaje = "Material actualizado correctamente."
-            else:
-                reportes.agregar_material(
-                    codigo,
-                    descripcion,
-                    categoria
-                )
-                mensaje = "Material agregado correctamente."
 
-            messagebox.showinfo("Material", mensaje)
+            reportes.agregar_material(
+                codigo,
+                descripcion,
+                categoria
+            )
+
+            messagebox.showinfo(
+                "Material",
+                "Material agregado correctamente."
+            )
+
             self.mostrar_materiales()
 
         except Exception as e:
+
             messagebox.showerror(
                 "Error",
-                f"No se pudo guardar el material.\n\n{e}"
+                f"No se pudo agregar el material.\n\n{e}"
             )
 
-    def cargar_materiales(self):
+    def filtrar_materiales(self, event=None):
+        texto = self.busqueda_materiales.get().strip().lower()
+
         for item in self.tabla_materiales.get_children():
             self.tabla_materiales.delete(item)
 
         materiales = reportes.obtener_materiales()
 
         for material in materiales:
+            if (
+                not texto
+                or texto in material.codigo.lower()
+                or texto in material.descripcion.lower()
+                or texto in material.categoria.lower()
+            ):
+                self.tabla_materiales.insert(
+                    "",
+                    "end",
+                    values=(
+                        material.codigo,
+                        material.descripcion,
+                        material.categoria
+                    )
+                )
+
+    def cargar_materiales(self):
+
+        materiales = reportes.obtener_materiales()
+
+        for material in materiales:
+
             self.tabla_materiales.insert(
                 "",
                 "end",
@@ -342,141 +430,145 @@ class App(tk.Tk):
     # =========================================================
 
     def mostrar_relaciones(self):
+
         self.limpiar_contenido()
+        self.configurar_enter(self.guardar_relacion)
 
-        # =========================
-        # FORMULARIO
-        # =========================
+        tk.Label(
+            self.contenido,
+            text="Solicitantes y líderes",
+            font=("Arial", 22, "bold")
+        ).pack(pady=25)
 
-        frame_form = ttk.Frame(self.contenido)
-        frame_form.pack(pady=10)
+        formulario = tk.Frame(self.contenido)
+        formulario.pack()
 
-        ttk.Label(
-            frame_form,
+        tk.Label(
+            formulario,
             text="Solicitante:"
-        ).grid(row=0, column=0, padx=5, pady=5)
+        ).grid(
+            row=0,
+            column=0,
+            sticky="e",
+            padx=10,
+            pady=10
+        )
 
-        self.relacion_solicitante = ttk.Entry(frame_form)
-        self.relacion_solicitante.grid(row=0, column=1, padx=5, pady=5)
+        self.relacion_solicitante = ttk.Entry(
+            formulario,
+            width=40
+        )
 
-        ttk.Label(
-            frame_form,
+        self.relacion_solicitante.grid(
+            row=0,
+            column=1,
+            padx=10,
+            pady=10
+        )
+
+        tk.Label(
+            formulario,
             text="Líder:"
-        ).grid(row=1, column=0, padx=5, pady=5)
+        ).grid(
+            row=1,
+            column=0,
+            sticky="e",
+            padx=10,
+            pady=10
+        )
 
-        self.relacion_lider = ttk.Entry(frame_form)
-        self.relacion_lider.grid(row=1, column=1, padx=5, pady=5)
+        self.relacion_lider = ttk.Entry(
+            formulario,
+            width=40
+        )
+
+        self.relacion_lider.grid(
+            row=1,
+            column=1,
+            padx=10,
+            pady=10
+        )
+
+        botones = tk.Frame(formulario)
+        botones.grid(
+            row=2,
+            column=0,
+            columnspan=2,
+            pady=20
+        )
 
         ttk.Button(
-            frame_form,
+            botones,
             text="Guardar",
             command=self.guardar_relacion
-        ).grid(row=2, column=0, padx=5, pady=10)
+        ).pack(
+            side="left",
+            padx=5
+        )
 
         ttk.Button(
-            frame_form,
+            botones,
             text="Cancelar",
             command=self.mostrar_inicio
-        ).grid(row=2, column=1, padx=5, pady=10)
+        ).pack(
+            side="left",
+            padx=5
+        )
 
-        # =========================
-        # TABLA
-        # =========================
-
-        ttk.Label(
+        tk.Label(
             self.contenido,
             text="Relaciones registradas",
-            font=("Arial", 16, "bold")
-        ).pack(pady=10)
+            font=("Arial", 14, "bold")
+        ).pack(
+            pady=(20, 10)
+        )
+
+        tabla_frame = tk.Frame(self.contenido)
+        tabla_frame.pack(
+            fill="both",
+            expand=True,
+            padx=30,
+            pady=10
+        )
+
+        columnas = (
+            "solicitante",
+            "lider"
+        )
 
         self.tabla_relaciones = ttk.Treeview(
-            self.contenido,
-            columns=("id", "solicitante", "lider"),
+            tabla_frame,
+            columns=columnas,
             show="headings"
         )
 
-        self.tabla_relaciones.heading("id", text="ID")
-        self.tabla_relaciones.heading("solicitante", text="Solicitante")
-        self.tabla_relaciones.heading("lider", text="Líder")
+        self.tabla_relaciones.heading(
+            "solicitante",
+            text="Solicitante"
+        )
 
-        self.tabla_relaciones.column("id", width=80)
-        self.tabla_relaciones.column("solicitante", width=200)
-        self.tabla_relaciones.column("lider", width=200)
+        self.tabla_relaciones.heading(
+            "lider",
+            text="Líder"
+        )
+
+        self.tabla_relaciones.column(
+            "solicitante",
+            width=300
+        )
+
+        self.tabla_relaciones.column(
+            "lider",
+            width=300
+        )
 
         self.tabla_relaciones.pack(
             fill="both",
             expand=True
         )
 
-        self.tabla_relaciones.bind(
-            "<Double-1>",
-            self.editar_relacion
-        )
-
         self.cargar_relaciones()
 
-
-    def editar_relacion(self, event):
-
-        datos = self.tabla_relaciones.item(
-            self.tabla_relaciones.selection()
-        )
-
-        valores = datos["values"]
-
-        id_relacion = valores[0]
-
-        relacion = reportes.obtener_relacion(id_relacion)
-
-        ventana = tk.Toplevel(self)
-        ventana.title("Editar relación")
-        ventana.geometry("300x150")
-
-        formulario = tk.Frame(ventana)
-        formulario.pack()
-        tk.Label(
-        formulario,
-        text="Solicitante:"
-        ).pack()
-
-        entrada_solicitante = tk.Entry(formulario)
-        entrada_solicitante.pack()
-
-        tk.Label(
-        formulario,
-        text="Líder:"
-        ).pack()
-
-        entrada_lider = tk.Entry(formulario)
-        entrada_lider.pack()
-
-        entrada_solicitante.insert(0, relacion.solicitante)
-        entrada_lider.insert(0, relacion.lider)
-
-
-        def guardar_cambios():
-            nuevo_solicitante = entrada_solicitante.get()
-            nuevo_lider = entrada_lider.get()
-
-            reportes.actualizar_relacion(
-                id_relacion,
-                nuevo_solicitante,
-                nuevo_lider
-            )
-
-            ventana.destroy()
-            self.mostrar_relaciones()
-        
-        tk.Button(
-        formulario,
-        text="Guardar cambios",
-        command=guardar_cambios
-        ).pack(pady=20)
-        
-
-        ventana.bind("<Return>", lambda event: guardar_cambios())
-
-    
     def guardar_relacion(self):
 
         solicitante = self.relacion_solicitante.get().strip()
@@ -522,10 +614,8 @@ class App(tk.Tk):
                 "",
                 "end",
                 values=(
-                    relacion.id,
                     relacion.solicitante,
                     relacion.lider
-                    
                 )
             )
 
@@ -676,46 +766,61 @@ class App(tk.Tk):
         )
 
         # -----------------------------------------------------
-        # LÍDER
+        # CONTENEDOR EPP
         # -----------------------------------------------------
 
+        self.frame_epp = tk.Frame(
+            formulario
+        )
+
+        self.frame_epp.grid(
+            row=4,
+            column=0,
+            columnspan=2,
+            pady=5
+        )
+
         tk.Label(
-            formulario,
+            self.frame_epp,
             text="Líder:"
         ).grid(
-            row=4, column=0, sticky="e", padx=10, pady=10
+            row=0,
+            column=0,
+            sticky="e",
+            padx=10,
+            pady=10
         )
 
         lideres = reportes.obtener_lideres()
 
         self.lider_reporte = ttk.Combobox(
-            formulario,
+            self.frame_epp,
             values=lideres,
             state="readonly",
             width=47
         )
+
         self.lider_reporte.grid(
-            row=4, column=1, padx=10, pady=10
+            row=0,
+            column=1,
+            padx=10,
+            pady=10
         )
+
         self.lider_reporte.bind(
             "<<ComboboxSelected>>",
             self.actualizar_solicitantes
-        )
-
-        # -----------------------------------------------------
-        # CONTENEDOR EPP (solo solicitante)
-        # -----------------------------------------------------
-
-        self.frame_epp = tk.Frame(formulario)
-        self.frame_epp.grid(
-            row=5, column=0, columnspan=2, pady=5
         )
 
         tk.Label(
             self.frame_epp,
             text="Solicitante:"
         ).grid(
-            row=0, column=0, sticky="e", padx=10, pady=10
+            row=1,
+            column=0,
+            sticky="e",
+            padx=10,
+            pady=10
         )
 
         self.solicitante_reporte = ttk.Combobox(
@@ -723,8 +828,12 @@ class App(tk.Tk):
             state="readonly",
             width=47
         )
+
         self.solicitante_reporte.grid(
-            row=0, column=1, padx=10, pady=10
+            row=1,
+            column=1,
+            padx=10,
+            pady=10
         )
 
         # -----------------------------------------------------
@@ -735,7 +844,7 @@ class App(tk.Tk):
             formulario,
             text="Fabricación:"
         ).grid(
-            row=6,
+            row=5,
             column=0,
             sticky="e",
             padx=10,
@@ -748,7 +857,7 @@ class App(tk.Tk):
         )
 
         self.fabricacion_entry.grid(
-            row=6,
+            row=5,
             column=1,
             padx=10,
             pady=10
@@ -763,7 +872,7 @@ class App(tk.Tk):
         )
 
         botones.grid(
-            row=7,
+            row=6,
             column=0,
             columnspan=2,
             pady=25
@@ -859,6 +968,8 @@ class App(tk.Tk):
         else:
 
             self.frame_epp.grid_remove()
+
+            self.lider_reporte.set("")
             self.solicitante_reporte.set("")
 
     # =========================================================
@@ -922,7 +1033,6 @@ class App(tk.Tk):
         cantidad = self.cantidad_entry.get().strip()
         fabricacion = self.fabricacion_entry.get().strip()
 
-        lider = self.lider_reporte.get().strip()
         solicitante = None
 
         # -----------------------------------------------------
@@ -1012,12 +1122,32 @@ class App(tk.Tk):
                 codigo,
                 cantidad,
                 solicitante,
-                lider,
                 fabricacion
             )
 
+            mensaje = (
+                f"Reporte creado correctamente.\n\n"
+                f"Código: {registro.codigo}\n"
+                f"Descripción: {registro.descripcion}\n"
+                f"Categoría: {categoria}\n"
+                f"Cantidad: {registro.cantidad}\n"
+            )
 
-        
+            if registro.solicitante:
+
+                mensaje += (
+                    f"Solicitante: {registro.solicitante}\n"
+                    f"Líder: {registro.lider}\n"
+                )
+
+            mensaje += (
+                f"Fabricación: {registro.fabricacion}"
+            )
+
+            messagebox.showinfo(
+                "Reporte creado",
+                mensaje
+            )
 
             self.mostrar_nuevo_reporte()
 
@@ -1036,270 +1166,11 @@ class App(tk.Tk):
             )
 
     # =========================================================
-    # EDITAR REPORTE
-    # =========================================================
-
-    def editar_reporte_seleccionado(self, event=None):
-        seleccion = self.tabla.selection()
-
-        if not seleccion:
-            messagebox.showwarning(
-                "Reporte",
-                "Selecciona un reporte de la tabla."
-            )
-            return
-
-        valores = self.tabla.item(seleccion[0], "values")
-        try:
-            id_registro = int(valores[0])
-        except (ValueError, IndexError):
-            messagebox.showerror("Reporte", "No se pudo obtener el ID del reporte.")
-            return
-
-        self.mostrar_editar_reporte(id_registro)
-
-    def mostrar_editar_reporte(self, id_registro):
-        registro = reportes.obtener_registro(id_registro)
-
-        if not registro:
-            messagebox.showerror("Reporte", "El reporte no existe.")
-            return
-
-        ventana = tk.Toplevel(self)
-        ventana.title(f"Editar reporte #{registro.id}")
-        ventana.geometry("560x500")
-        ventana.transient(self)
-        ventana.grab_set()
-
-        tk.Label(
-            ventana,
-            text=f"Editar reporte #{registro.id}",
-            font=("Arial", 20, "bold")
-        ).pack(pady=20)
-
-        formulario = tk.Frame(ventana)
-        formulario.pack()
-
-        tk.Label(formulario, text="Material:").grid(
-            row=0, column=0, sticky="e", padx=10, pady=8
-        )
-
-        materiales = reportes.obtener_materiales()
-        descripciones = [m.descripcion for m in materiales]
-
-        material_var = tk.StringVar()
-        material_combo = ttk.Combobox(
-            formulario,
-            textvariable=material_var,
-            values=descripciones,
-            width=42,
-            state="readonly"
-        )
-        material_combo.grid(row=0, column=1, padx=10, pady=8)
-
-        tk.Label(formulario, text="Código:").grid(
-            row=1, column=0, sticky="e", padx=10, pady=8
-        )
-        codigo_var = tk.StringVar(value=registro.codigo)
-        tk.Entry(
-            formulario,
-            textvariable=codigo_var,
-            width=45,
-            state="readonly"
-        ).grid(row=1, column=1, padx=10, pady=8)
-
-        tk.Label(formulario, text="Categoría:").grid(
-            row=2, column=0, sticky="e", padx=10, pady=8
-        )
-        categoria_var = tk.StringVar()
-        tk.Entry(
-            formulario,
-            textvariable=categoria_var,
-            width=45,
-            state="readonly"
-        ).grid(row=2, column=1, padx=10, pady=8)
-
-        tk.Label(formulario, text="Cantidad:").grid(
-            row=3, column=0, sticky="e", padx=10, pady=8
-        )
-        cantidad_entry = ttk.Entry(formulario, width=45)
-        cantidad_entry.insert(0, str(registro.cantidad))
-        cantidad_entry.grid(row=3, column=1, padx=10, pady=8)
-
-        tk.Label(formulario, text="Líder:").grid(
-            row=4, column=0, sticky="e", padx=10, pady=8
-        )
-        lider_combo = ttk.Combobox(
-            formulario,
-            values=reportes.obtener_lideres(),
-            state="readonly",
-            width=42
-        )
-        lider_combo.grid(row=4, column=1, padx=10, pady=8)
-
-        frame_epp = tk.Frame(formulario)
-        frame_epp.grid(row=6, column=0, columnspan=2, pady=5)
-
-        tk.Label(frame_epp, text="Solicitante:").grid(
-            row=0, column=0, sticky="e", padx=10, pady=8
-        )
-        solicitante_combo = ttk.Combobox(
-            frame_epp,
-            state="readonly",
-            width=42
-        )
-        solicitante_combo.grid(row=0, column=1, padx=10, pady=8)
-
-        tk.Label(formulario, text="Fabricación:").grid(
-            row=6, column=0, sticky="e", padx=10, pady=8
-        )
-        fabricacion_entry = ttk.Entry(formulario, width=45)
-        fabricacion_entry.insert(0, registro.fabricacion)
-        fabricacion_entry.grid(row=6, column=1, padx=10, pady=8)
-
-        def seleccionar_material(event=None):
-            descripcion = material_var.get()
-            material = next(
-                (m for m in materiales if m.descripcion == descripcion),
-                None
-            )
-
-            if not material:
-                return
-
-            codigo_var.set(material.codigo)
-            categoria_var.set(material.categoria)
-
-            if material.categoria == "EPP":
-                frame_epp.grid()
-                if lider_combo.get():
-                    solicitante_combo["values"] = (
-                        reportes.obtener_solicitantes_por_lider(lider_combo.get())
-                    )
-            else:
-                frame_epp.grid_remove()
-                solicitante_combo.set("")
-
-        def actualizar_solicitantes(event=None):
-            lider = lider_combo.get()
-            if lider:
-                solicitante_combo["values"] = (
-                    reportes.obtener_solicitantes_por_lider(lider)
-                )
-                solicitante_combo.set("")
-
-        material_combo.bind("<<ComboboxSelected>>", seleccionar_material)
-        lider_combo.bind("<<ComboboxSelected>>", actualizar_solicitantes)
-
-        # Cargar datos actuales
-        material_actual = next(
-            (m for m in materiales if m.codigo == registro.codigo),
-            None
-        )
-        if material_actual:
-            material_var.set(material_actual.descripcion)
-            categoria_var.set(material_actual.categoria)
-
-        if registro.lider:
-            lider_combo.set(registro.lider)
-            solicitante_combo["values"] = (
-                reportes.obtener_solicitantes_por_lider(registro.lider)
-            )
-        if registro.solicitante:
-            solicitante_combo.set(registro.solicitante)
-
-        if categoria_var.get() == "EPP":
-            frame_epp.grid()
-        else:
-            frame_epp.grid_remove()
-
-        def guardar_cambios():
-            codigo = codigo_var.get().strip()
-            categoria = categoria_var.get().strip()
-            cantidad_texto = cantidad_entry.get().strip()
-            fabricacion = fabricacion_entry.get().strip()
-            lider = lider_combo.get().strip() or None
-            solicitante = solicitante_combo.get().strip() or None
-
-            if not codigo:
-                messagebox.showwarning("Material", "Selecciona un material.", parent=ventana)
-                return
-            if not cantidad_texto:
-                messagebox.showwarning("Cantidad", "Ingresa una cantidad.", parent=ventana)
-                return
-            if not fabricacion:
-                messagebox.showwarning("Fabricación", "Ingresa la fabricación.", parent=ventana)
-                return
-            if not lider:
-                messagebox.showwarning("Líder", "Selecciona un líder.", parent=ventana)
-                return
-
-            if categoria != "EPP":
-                solicitante = None
-
-            try:
-                cantidad = float(cantidad_texto)
-                if cantidad <= 0:
-                    raise ValueError
-            except ValueError:
-                messagebox.showerror(
-                    "Cantidad inválida",
-                    "La cantidad debe ser un número mayor que cero.",
-                    parent=ventana
-                )
-                return
-
-            if categoria == "EPP" and not solicitante:
-                messagebox.showwarning(
-                    "Solicitante",
-                    "Los materiales EPP requieren un solicitante.",
-                    parent=ventana
-                )
-                return
-
-            try:
-                reportes.actualizar_registro(
-                    registro.id,
-                    codigo,
-                    cantidad,
-                    solicitante,
-                    lider,
-                    fabricacion
-                )
-                messagebox.showinfo(
-                    "Reporte actualizado",
-                    "El reporte se actualizó correctamente.",
-                    parent=ventana
-                )
-                ventana.destroy()
-                self.buscar_reportes()
-            except Exception as e:
-                messagebox.showerror(
-                    "Error",
-                    f"No se pudo actualizar el reporte.\n\n{e}",
-                    parent=ventana
-                )
-
-        botones = tk.Frame(ventana)
-        botones.pack(pady=20)
-
-        ttk.Button(
-            botones,
-            text="Guardar cambios",
-            command=guardar_cambios
-        ).pack(side="left", padx=5)
-
-        ttk.Button(
-            botones,
-            text="Cancelar",
-            command=ventana.destroy
-        ).pack(side="left", padx=5)
-
-    # =========================================================
     # CONSULTAS
     # =========================================================
 
     def mostrar_consultas(self):
+
         self.limpiar_contenido()
         self.configurar_enter(self.buscar_reportes)
 
@@ -1309,63 +1180,163 @@ class App(tk.Tk):
             font=("Arial", 22, "bold")
         ).pack(pady=20)
 
-        filtros = tk.Frame(self.contenido)
+        filtros = tk.Frame(
+            self.contenido
+        )
+
         filtros.pack()
 
-        tk.Label(filtros, text="ID:").grid(row=0, column=0, padx=5, pady=5)
-        self.filtro_id = ttk.Entry(filtros, width=12)
-        self.filtro_id.grid(row=0, column=1, padx=5, pady=5)
-
-        tk.Label(filtros, text="Código:").grid(row=0, column=2, padx=5, pady=5)
-        self.filtro_codigo = ttk.Entry(filtros, width=16)
-        self.filtro_codigo.grid(row=0, column=3, padx=5, pady=5)
-
-        tk.Label(filtros, text="Solicitante:").grid(row=0, column=4, padx=5, pady=5)
-        self.filtro_solicitante = ttk.Entry(filtros, width=16)
-        self.filtro_solicitante.grid(row=0, column=5, padx=5, pady=5)
-
-        tk.Label(filtros, text="Líder:").grid(row=0, column=6, padx=5, pady=5)
-        self.filtro_lider = ttk.Entry(filtros, width=16)
-        self.filtro_lider.grid(row=0, column=7, padx=5, pady=5)
-
-        tk.Label(filtros, text="Fabricación:").grid(row=1, column=0, padx=5, pady=5)
-        self.filtro_fabricacion = ttk.Entry(filtros, width=16)
-        self.filtro_fabricacion.grid(row=1, column=1, padx=5, pady=5)
-
-        tk.Label(filtros, text="Tipo:").grid(row=1, column=2, padx=5, pady=5)
-        self.filtro_categoria = ttk.Combobox(
+        tk.Label(
             filtros,
-            values=["Todos"] + reportes.obtener_categorias(),
-            state="readonly",
-            width=14
+            text="Código:"
+        ).grid(
+            row=0,
+            column=0,
+            padx=5,
+            pady=5
         )
-        self.filtro_categoria.grid(row=1, column=3, padx=5, pady=5)
-        self.filtro_categoria.set("Todos")
 
-        tk.Label(filtros, text="Desde:").grid(row=1, column=4, padx=5, pady=5)
+        self.filtro_codigo = ttk.Entry(
+            filtros,
+            width=20
+        )
+
+        self.filtro_codigo.grid(
+            row=0,
+            column=1,
+            padx=5,
+            pady=5
+        )
+
+        tk.Label(
+            filtros,
+            text="Solicitante:"
+        ).grid(
+            row=0,
+            column=2,
+            padx=5,
+            pady=5
+        )
+
+        self.filtro_solicitante = ttk.Entry(
+            filtros,
+            width=20
+        )
+
+        self.filtro_solicitante.grid(
+            row=0,
+            column=3,
+            padx=5,
+            pady=5
+        )
+
+        tk.Label(
+            filtros,
+            text="Líder:"
+        ).grid(
+            row=0,
+            column=4,
+            padx=5,
+            pady=5
+        )
+
+        self.filtro_lider = ttk.Entry(
+            filtros,
+            width=20
+        )
+
+        self.filtro_lider.grid(
+            row=0,
+            column=5,
+            padx=5,
+            pady=5
+        )
+
+        tk.Label(
+            filtros,
+            text="Desde:"
+        ).grid(
+            row=1,
+            column=0,
+            padx=5,
+            pady=5
+        )
+
         self.filtro_fecha_inicio = DateEntry(
-            filtros, width=13, date_pattern="yyyy-mm-dd"
+            filtros,
+            width=17,
+            date_pattern="yyyy-mm-dd"
         )
-        self.filtro_fecha_inicio.grid(row=1, column=5, padx=5, pady=5)
 
-        tk.Label(filtros, text="Hasta:").grid(row=1, column=6, padx=5, pady=5)
-        self.filtro_fecha_fin = DateEntry(
-            filtros, width=13, date_pattern="yyyy-mm-dd"
+        self.filtro_fecha_inicio.grid(
+            row=1,
+            column=1,
+            padx=5,
+            pady=5
         )
-        self.filtro_fecha_fin.grid(row=1, column=7, padx=5, pady=5)
+
+        tk.Label(
+            filtros,
+            text="Hasta:"
+        ).grid(
+            row=1,
+            column=2,
+            padx=5,
+            pady=5
+        )
+
+        self.filtro_fecha_fin = DateEntry(
+            filtros,
+            width=17,
+            date_pattern="yyyy-mm-dd"
+        )
+
+        self.filtro_fecha_fin.grid(
+            row=1,
+            column=3,
+            padx=5,
+            pady=5
+        )
+        tk.Label(
+            filtros,
+            text="Hasta:"
+            ).grid(
+                row=1,
+                column=2,
+                padx=5,
+                pady=5
+        )
 
         ttk.Button(
             filtros,
             text="Buscar",
             command=self.buscar_reportes
-        ).grid(row=2, column=7, padx=10, pady=10, sticky="e")
+        ).grid(
+            row=1,
+            column=5,
+            padx=10
+        )
 
-        tabla_frame = tk.Frame(self.contenido)
-        tabla_frame.pack(fill="both", expand=True, padx=20, pady=15)
+        tabla_frame = tk.Frame(
+            self.contenido
+        )
+
+        tabla_frame.pack(
+            fill="both",
+            expand=True,
+            padx=20,
+            pady=20
+        )
 
         columnas = (
-            "id", "codigo", "descripcion", "cantidad",
-            "solicitante", "lider", "fabricacion", "fecha"
+            "id",
+            "codigo",
+            "descripcion",
+            "cantidad",
+            "solicitante",
+            "lider",
+            "fabricacion",
+            "fecha"
         )
 
         self.tabla = ttk.Treeview(
@@ -1386,71 +1357,104 @@ class App(tk.Tk):
         }
 
         for columna in columnas:
-            self.tabla.heading(columna, text=encabezados[columna])
-            self.tabla.column(columna, width=110)
 
-        self.tabla.bind("<Double-1>", self.editar_reporte_seleccionado)
+            self.tabla.heading(
+                columna,
+                text=encabezados[columna]
+            )
+
+            self.tabla.column(
+                columna,
+                width=110
+            )
 
         scrollbar = ttk.Scrollbar(
             tabla_frame,
             orient="vertical",
             command=self.tabla.yview
         )
-        self.tabla.configure(yscrollcommand=scrollbar.set)
 
-        self.tabla.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+        self.tabla.configure(
+            yscrollcommand=scrollbar.set
+        )
 
-        botones = tk.Frame(self.contenido)
-        botones.pack(pady=10)
+        self.tabla.pack(
+            side="left",
+            fill="both",
+            expand=True
+        )
 
-        ttk.Button(
-            botones,
-            text="Editar seleccionado",
-            command=self.editar_reporte_seleccionado
-        ).pack(side="left", padx=5)
+        scrollbar.pack(
+            side="right",
+            fill="y"
+        )
+
+        botones = tk.Frame(
+            self.contenido
+        )
+
+        botones.pack(
+            pady=10
+        )
 
         ttk.Button(
             botones,
             text="Exportar resultados a Excel",
             command=self.exportar_resultados
-        ).pack(side="left", padx=5)
+        ).pack(
+            side="left",
+            padx=5
+        )
 
         ttk.Button(
             botones,
             text="Volver",
             command=self.mostrar_inicio
-        ).pack(side="left", padx=5)
+        ).pack(
+            side="left",
+            padx=5
+        )
 
     def buscar_reportes(self):
+
         try:
-            id_texto = self.filtro_id.get().strip()
-            id_registro = int(id_texto) if id_texto else None
 
-            codigo = self.filtro_codigo.get().strip() or None
-            solicitante = self.filtro_solicitante.get().strip() or None
-            lider = self.filtro_lider.get().strip() or None
-            fabricacion = self.filtro_fabricacion.get().strip() or None
+            codigo = (
+                self.filtro_codigo.get()
+                or None
+            )
 
-            categoria = self.filtro_categoria.get().strip()
-            if categoria == "Todos" or not categoria:
-                categoria = None
+            solicitante = (
+                self.filtro_solicitante.get()
+                or None
+            )
 
-            fecha_inicio = datetime.strptime(
-                self.filtro_fecha_inicio.get(), "%Y-%m-%d"
-            ).date() if self.filtro_fecha_inicio.get() else None
+            lider = (
+                self.filtro_lider.get()
+                or None
+            )
 
-            fecha_fin = datetime.strptime(
-                self.filtro_fecha_fin.get(), "%Y-%m-%d"
-            ).date() if self.filtro_fecha_fin.get() else None
+            fecha_inicio = None
+            fecha_fin = None
+
+            if self.filtro_fecha_inicio.get():
+
+                fecha_inicio = datetime.strptime(
+                    self.filtro_fecha_inicio.get(),
+                    "%Y-%m-%d"
+                ).date()
+
+            if self.filtro_fecha_fin.get():
+
+                fecha_fin = datetime.strptime(
+                    self.filtro_fecha_fin.get(),
+                    "%Y-%m-%d"
+                ).date()
 
             registros = reportes.obtener_registros(
-                id_registro=id_registro,
                 codigo=codigo,
                 solicitante=solicitante,
                 lider=lider,
-                fabricacion=fabricacion,
-                categoria=categoria,
                 fecha_inicio=fecha_inicio,
                 fecha_fin=fecha_fin
             )
@@ -1458,9 +1462,11 @@ class App(tk.Tk):
             self.registros_actuales = registros
 
             for item in self.tabla.get_children():
+
                 self.tabla.delete(item)
 
             for registro in registros:
+
                 self.tabla.insert(
                     "",
                     "end",
@@ -1472,20 +1478,24 @@ class App(tk.Tk):
                         registro.solicitante or "",
                         registro.lider or "",
                         registro.fabricacion,
-                        registro.fecha.strftime("%Y-%m-%d")
+                        registro.fecha.strftime(
+                            "%Y-%m-%d"
+                        )
                     )
                 )
 
             if not registros:
+
                 messagebox.showinfo(
                     "Consulta",
                     "No se encontraron reportes."
                 )
 
         except ValueError:
+
             messagebox.showerror(
-                "Filtro inválido",
-                "El ID debe ser un número entero y las fechas deben usar YYYY-MM-DD."
+                "Fecha inválida",
+                "Utiliza el formato YYYY-MM-DD."
             )
 
     # =========================================================
