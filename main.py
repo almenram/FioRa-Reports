@@ -1,3 +1,4 @@
+
 from exportar import exportar_excel
 
 from database import Base, engine
@@ -19,10 +20,20 @@ class App(tk.Tk):
         self.geometry("1100x650")
         self.minsize(900, 550)
 
+        self.autocomplete_popup = None
+        self.autocomplete_listbox = None
+        self.autocomplete_widget = None
+        self.autocomplete_callback = None
+
+        # Cierra cualquier autocomplete cuando se hace clic fuera del campo
+        # y de la lista de sugerencias.
+        self.bind_all("<Button-1>", self.autocomplete_click_fuera, add="+")
+
         self.registros_actuales = []
 
         # Materiales cargados para el formulario
         self.materiales = []
+        self.solicitantes_reporte = []
 
         self.crear_interfaz()
 
@@ -197,14 +208,11 @@ class App(tk.Tk):
             pady=10
         )
 
+        categorias = reportes.obtener_categorias()
         self.material_categoria = ttk.Combobox(
             formulario,
-            values=[
-                "EPP",
-                "DISCOS",
-                "SOLDADURA"
-            ],
-            state="readonly",
+            values=categorias,
+            state="normal",
             width=37
         )
 
@@ -215,7 +223,7 @@ class App(tk.Tk):
             pady=10
         )
 
-        self.material_categoria.current(0)
+        self.material_categoria.set("EPP")
 
         botones = tk.Frame(formulario)
         botones.grid(
@@ -658,10 +666,9 @@ class App(tk.Tk):
             for material in self.materiales
         ]
 
-        self.material_descripcion_reporte = ttk.Combobox(
+        self.material_descripcion_reporte = ttk.Entry(
             formulario,
-            values=descripciones,
-            width=47
+            width=50
         )
 
         self.material_descripcion_reporte.grid(
@@ -672,13 +679,24 @@ class App(tk.Tk):
         )
 
         self.material_descripcion_reporte.bind(
-            "<<ComboboxSelected>>",
-            self.material_seleccionado
-        )
-
-        self.material_descripcion_reporte.bind(
             "<KeyRelease>",
             self.buscar_material
+        )
+        self.material_descripcion_reporte.bind(
+            "<Down>",
+            self.autocomplete_down
+        )
+        self.material_descripcion_reporte.bind(
+            "<Up>",
+            self.autocomplete_up
+        )
+        self.material_descripcion_reporte.bind(
+            "<Return>",
+            self.autocomplete_enter
+        )
+        self.material_descripcion_reporte.bind(
+            "<Escape>",
+            self.autocomplete_escape
         )
 
         # -----------------------------------------------------
@@ -794,27 +812,37 @@ class App(tk.Tk):
 
         self.lideres_reporte = lideres
 
-        self.lider_reporte = ttk.Combobox(
+        self.lider_reporte = ttk.Entry(
             self.frame_epp,
-            values=lideres,
-            width=47
+            width=50
         )
 
         self.lider_reporte.grid(
             row=0,
             column=1,
-            padx=(43,10),
+            padx=(46,10),
             pady=10
-        )
-
-        self.lider_reporte.bind(
-            "<<ComboboxSelected>>",
-            self.actualizar_solicitantes
         )
 
         self.lider_reporte.bind(
             "<KeyRelease>",
             self.buscar_lider_reporte
+        )
+        self.lider_reporte.bind(
+            "<Down>",
+            self.autocomplete_down
+        )
+        self.lider_reporte.bind(
+            "<Up>",
+            self.autocomplete_up
+        )
+        self.lider_reporte.bind(
+            "<Return>",
+            self.autocomplete_enter
+        )
+        self.lider_reporte.bind(
+            "<Escape>",
+            self.autocomplete_escape
         )
 
         self.label_solicitante = tk.Label(
@@ -830,9 +858,9 @@ class App(tk.Tk):
             pady=10
         )
 
-        self.solicitante_reporte = ttk.Combobox(
+        self.solicitante_reporte = ttk.Entry(
             self.frame_epp,
-            width=47
+            width=50
         )
 
         self.solicitante_reporte.grid(
@@ -845,6 +873,22 @@ class App(tk.Tk):
         self.solicitante_reporte.bind(
             "<KeyRelease>",
             self.buscar_solicitante_reporte
+        )
+        self.solicitante_reporte.bind(
+            "<Down>",
+            self.autocomplete_down
+        )
+        self.solicitante_reporte.bind(
+            "<Up>",
+            self.autocomplete_up
+        )
+        self.solicitante_reporte.bind(
+            "<Return>",
+            self.autocomplete_enter
+        )
+        self.solicitante_reporte.bind(
+            "<Escape>",
+            self.autocomplete_escape
         )
 
         # -----------------------------------------------------
@@ -980,118 +1024,286 @@ class App(tk.Tk):
         else:
             self.label_solicitante.grid_remove()
             self.solicitante_reporte.grid_remove()
-            self.solicitante_reporte.set("")
+            self.solicitante_reporte.delete(0, tk.END)
+
+    # =========================================================
+    # AUTOCOMPLETE GENÉRICO
+    # =========================================================
+
+    def mostrar_sugerencias(self, widget, resultados, callback):
+
+        self.cerrar_autocomplete()
+
+        if not resultados:
+            return
+
+        popup = tk.Toplevel(self)
+        popup.overrideredirect(True)
+        popup.attributes("-topmost", True)
+
+        x = widget.winfo_rootx()
+        y = widget.winfo_rooty() + widget.winfo_height()
+        ancho = max(widget.winfo_width(), 250)
+        alto = min(len(resultados), 8) * 24
+        popup.geometry(f"{ancho}x{alto}+{x}+{y}")
+
+        lista = tk.Listbox(popup, activestyle="dotbox")
+        lista.pack(fill="both", expand=True)
+
+        for item in resultados:
+            lista.insert(tk.END, item)
+
+        lista.selection_set(0)
+        lista.activate(0)
+
+        lista.bind("<ButtonRelease-1>", lambda e: callback())
+
+        self.autocomplete_popup = popup
+        self.autocomplete_listbox = lista
+        self.autocomplete_widget = widget
+        self.autocomplete_callback = callback
+
+        # El teclado permanece en el campo mientras la lista está abierta.
+        widget.focus_set()
+
+    def autocomplete_click_fuera(self, event=None):
+        """Cierra el autocomplete al hacer clic fuera del campo o su lista."""
+        popup = getattr(self, "autocomplete_popup", None)
+        widget = getattr(self, "autocomplete_widget", None)
+
+        if popup is None:
+            return
+
+        try:
+            clic = self.winfo_containing(event.x_root, event.y_root)
+        except (tk.TclError, AttributeError):
+            clic = None
+
+        # Si el clic fue sobre el Entry que está autocompletando, se conserva.
+        if clic is not None and widget is not None and clic == widget:
+            return
+
+        # Si el clic fue dentro del popup/lista, se conserva para que
+        # ButtonRelease-1 pueda seleccionar la sugerencia.
+        try:
+            if clic is not None and clic.winfo_toplevel() == popup:
+                return
+        except tk.TclError:
+            pass
+
+        self.cerrar_autocomplete()
+
+    def cerrar_autocomplete(self, event=None):
+        popup = getattr(self, "autocomplete_popup", None)
+        if popup is not None:
+            try:
+                popup.destroy()
+            except tk.TclError:
+                pass
+        self.autocomplete_popup = None
+        self.autocomplete_listbox = None
+        self.autocomplete_widget = None
+        self.autocomplete_callback = None
+
+    def autocomplete_down(self, event=None):
+        lista = getattr(self, "autocomplete_listbox", None)
+        if lista is None or lista.size() == 0:
+            return None
+
+        i = lista.curselection()
+        pos = i[0] + 1 if i else 0
+
+        if pos >= lista.size():
+            pos = lista.size() - 1
+
+        lista.selection_clear(0, tk.END)
+        lista.selection_set(pos)
+        lista.activate(pos)
+        lista.selection_anchor(pos)
+        lista.see(pos)
+
+        # El foco permanece en el Entry; la lista solo muestra la selección.
+        self.autocomplete_widget.focus_set()
+
+        return "break"
+
+    def autocomplete_up(self, event=None):
+        lista = getattr(self, "autocomplete_listbox", None)
+        if lista is None or lista.size() == 0:
+            return None
+
+        i = lista.curselection()
+        pos = i[0] - 1 if i else 0
+
+        if pos < 0:
+            pos = 0
+
+        lista.selection_clear(0, tk.END)
+        lista.selection_set(pos)
+        lista.activate(pos)
+        lista.selection_anchor(pos)
+        lista.see(pos)
+
+        # El foco permanece en el Entry; la lista solo muestra la selección.
+        self.autocomplete_widget.focus_set()
+
+        return "break"
+
+    def autocomplete_enter(self, event=None):
+        callback = getattr(self, "autocomplete_callback", None)
+        lista = getattr(self, "autocomplete_listbox", None)
+
+        if callback is not None and lista is not None and lista.size() > 0:
+            callback()
+            return "break"
+
+        # Si no hay sugerencias, Enter conserva su comportamiento normal
+        # (por ejemplo, ejecutar Buscar en Consultar reportes).
+        return None
+
+    def autocomplete_escape(self, event=None):
+        self.cerrar_autocomplete()
+        return "break"
 
     # =========================================================
     # AUTOCOMPLETE MATERIAL
     # =========================================================
 
     def buscar_material(self, event=None):
+        # Las flechas/Enter/Escape se manejan por los bindings del autocomplete.
+        # No debemos reconstruir la lista al soltar esas teclas, porque eso
+        # reiniciaría la selección visual a la primera opción.
+        if event is not None and event.keysym in (
+            "Up", "Down", "Return", "Escape"
+        ):
+            return
 
-        texto = (
-            self.material_descripcion_reporte
-            .get()
-            .strip()
+        texto = self.material_descripcion_reporte.get().strip()
+
+        if not texto:
+            self.cerrar_autocomplete()
+            return
+
+        resultados = reportes.buscar_materiales(texto)
+        nombres = [material.descripcion for material in resultados]
+
+        def seleccionar():
+            lista = self.autocomplete_listbox
+            i = lista.curselection()
+            if not i:
+                return
+            descripcion = lista.get(i[0])
+            self.material_descripcion_reporte.delete(0, tk.END)
+            self.material_descripcion_reporte.insert(0, descripcion)
+            self.cerrar_autocomplete()
+            self.material_seleccionado()
+
+        self.mostrar_sugerencias(
+            self.material_descripcion_reporte,
+            nombres,
+            seleccionar
         )
 
-        # Si no escribió nada, mostrar todos
-        if not texto:
+    # =========================================================
+    # ACTUALIZAR SOLICITANTES SEGÚN LÍDER
+    # =========================================================
 
-            resultados = reportes.obtener_materiales()
+    def actualizar_solicitantes(self, event=None):
+        lider = self.lider_reporte.get().strip()
 
-        else:
+        if not lider:
+            self.solicitantes_reporte = []
+            self.solicitante_reporte["values"] = []
+            self.solicitante_reporte.delete(0, tk.END)
+            return
 
-            resultados = reportes.buscar_materiales(
-                texto
-            )
+        solicitantes = reportes.obtener_solicitantes_por_lider(lider)
 
-        # Actualizar opciones del desplegable
-        valores = [material.descripcion for material in resultados]
-        self.material_descripcion_reporte["values"] = valores
-
-        if valores and texto:
-            self.material_descripcion_reporte.after_idle(
-                lambda: self.material_descripcion_reporte.tk.call(
-                    "ttk::combobox::Post",
-                    self.material_descripcion_reporte._w
-                )
-            )
+        self.solicitantes_reporte = solicitantes
+        self.solicitante_reporte["values"] = solicitantes
+        self.solicitante_reporte.delete(0, tk.END)
 
     # =========================================================
     # AUTOCOMPLETE LÍDER
     # =========================================================
 
     def buscar_lider_reporte(self, event=None):
+        # Las flechas/Enter/Escape se manejan por los bindings del autocomplete.
+        # No debemos reconstruir la lista al soltar esas teclas, porque eso
+        # reiniciaría la selección visual a la primera opción.
+        if event is not None and event.keysym in (
+            "Up", "Down", "Return", "Escape"
+        ):
+            return
 
         texto = self.lider_reporte.get().strip().lower()
 
         if not texto:
-            resultados = self.lideres_reporte
-        else:
-            resultados = [
-                lider
-                for lider in self.lideres_reporte
-                if texto in lider.lower()
-            ]
-
-        self.lider_reporte["values"] = resultados
-
-        if resultados and texto:
-            self.lider_reporte.after_idle(
-                lambda: self.lider_reporte.tk.call(
-                    "ttk::combobox::Post",
-                    self.lider_reporte._w
-                )
-            )
-
-    # =========================================================
-    # FILTRAR SOLICITANTES POR LÍDER
-    # =========================================================
-
-    def actualizar_solicitantes(self, event=None):
-
-        lider = self.lider_reporte.get()
-
-        if not lider:
+            self.cerrar_autocomplete()
             return
 
-        solicitantes = (
-            reportes.obtener_solicitantes_por_lider(
-                lider
-            )
-        )
+        resultados = [
+            lider for lider in self.lideres_reporte
+            if texto in lider.lower()
+        ]
 
-        self.solicitantes_reporte = solicitantes
-        self.solicitante_reporte["values"] = solicitantes
-        self.solicitante_reporte.set("")
+        def seleccionar():
+            lista = self.autocomplete_listbox
+            i = lista.curselection()
+            if not i:
+                return
+            lider = lista.get(i[0])
+            self.lider_reporte.delete(0, tk.END)
+            self.lider_reporte.insert(0, lider)
+            self.cerrar_autocomplete()
+            self.actualizar_solicitantes()
+
+        self.mostrar_sugerencias(
+            self.lider_reporte,
+            resultados,
+            seleccionar
+        )
 
     # =========================================================
     # AUTOCOMPLETE SOLICITANTE
     # =========================================================
 
     def buscar_solicitante_reporte(self, event=None):
+        # Las flechas/Enter/Escape se manejan por los bindings del autocomplete.
+        # No debemos reconstruir la lista al soltar esas teclas, porque eso
+        # reiniciaría la selección visual a la primera opción.
+        if event is not None and event.keysym in (
+            "Up", "Down", "Return", "Escape"
+        ):
+            return
 
         texto = self.solicitante_reporte.get().strip().lower()
         solicitantes = getattr(self, "solicitantes_reporte", [])
 
         if not texto:
-            resultados = solicitantes
-        else:
-            resultados = [
-                solicitante
-                for solicitante in solicitantes
-                if texto in solicitante.lower()
-            ]
+            self.cerrar_autocomplete()
+            return
 
-        self.solicitante_reporte["values"] = resultados
+        resultados = [
+            solicitante for solicitante in solicitantes
+            if texto in solicitante.lower()
+        ]
 
-        if resultados and texto:
-            self.solicitante_reporte.after_idle(
-                lambda: self.solicitante_reporte.tk.call(
-                    "ttk::combobox::Post",
-                    self.solicitante_reporte._w
-                )
-            )
+        def seleccionar():
+            lista = self.autocomplete_listbox
+            i = lista.curselection()
+            if not i:
+                return
+            solicitante = lista.get(i[0])
+            self.solicitante_reporte.delete(0, tk.END)
+            self.solicitante_reporte.insert(0, solicitante)
+            self.cerrar_autocomplete()
+
+        self.mostrar_sugerencias(
+            self.solicitante_reporte,
+            resultados,
+            seleccionar
+        )
 
     # =========================================================
     # CREAR REPORTE
@@ -1220,11 +1432,7 @@ class App(tk.Tk):
                 f"Fabricación: {registro.fabricacion}"
             )
 
-            messagebox.showinfo(
-                "Reporte creado",
-                mensaje
-            )
-
+          
             self.mostrar_nuevo_reporte()
 
         except ValueError as e:
@@ -1274,13 +1482,9 @@ class App(tk.Tk):
 
         self.materiales_filtro_codigo = reportes.obtener_materiales()
 
-        self.filtro_codigo = ttk.Combobox(
+        self.filtro_codigo = ttk.Entry(
             filtros,
-            values=[
-                f"{material.codigo} - {material.descripcion}"
-                for material in self.materiales_filtro_codigo
-            ],
-            width=35
+            width=38
         )
 
         self.filtro_codigo.grid(
@@ -1294,11 +1498,10 @@ class App(tk.Tk):
             "<KeyRelease>",
             self.autocompletar_codigo_reporte
         )
-
-        self.filtro_codigo.bind(
-            "<<ComboboxSelected>>",
-            self.seleccionar_codigo_reporte
-        )
+        self.filtro_codigo.bind("<Down>", self.autocomplete_down)
+        self.filtro_codigo.bind("<Up>", self.autocomplete_up)
+        self.filtro_codigo.bind("<Return>", self.autocomplete_enter)
+        self.filtro_codigo.bind("<Escape>", self.autocomplete_escape)
 
         tk.Label(
             filtros,
@@ -1332,14 +1535,61 @@ class App(tk.Tk):
             pady=5
         )
 
+        self.lideres_filtro = reportes.obtener_lideres()
+
+        # Entry + Listbox flotante en lugar de Combobox.
+        # Así el texto nunca es reemplazado mientras el usuario escribe.
         self.filtro_lider = ttk.Entry(
             filtros,
-            width=20
+            width=22
         )
 
         self.filtro_lider.grid(
             row=0,
             column=5,
+            padx=10,
+            pady=5
+        )
+
+        self.filtro_lider.bind(
+            "<KeyRelease>",
+            self.autocompletar_lider_reporte
+        )
+        self.filtro_lider.bind(
+            "<Down>",
+            self.autocomplete_down
+        )
+        self.filtro_lider.bind(
+            "<Up>",
+            self.autocomplete_up
+        )
+        self.filtro_lider.bind(
+            "<Return>",
+            self.autocomplete_enter
+        )
+        self.filtro_lider.bind(
+            "<Escape>",
+            self.autocomplete_escape
+        )
+
+        tk.Label(
+            filtros,
+            text="Fabricación:"
+        ).grid(
+            row=1,
+            column=0,
+            padx=5,
+            pady=5
+        )
+
+        self.filtro_fabricacion = ttk.Entry(
+            filtros,
+            width=20
+        )
+
+        self.filtro_fabricacion.grid(
+            row=1,
+            column=1,
             padx=5,
             pady=5
         )
@@ -1349,7 +1599,7 @@ class App(tk.Tk):
             text="Desde:"
         ).grid(
             row=1,
-            column=0,
+            column=2,
             padx=5,
             pady=5
         )
@@ -1362,7 +1612,7 @@ class App(tk.Tk):
 
         self.filtro_fecha_inicio.grid(
             row=1,
-            column=1,
+            column=3,
             padx=5,
             pady=5
         )
@@ -1372,7 +1622,7 @@ class App(tk.Tk):
             text="Hasta:"
         ).grid(
             row=1,
-            column=2,
+            column=4,
             padx=5,
             pady=5
         )
@@ -1385,26 +1635,56 @@ class App(tk.Tk):
 
         self.filtro_fecha_fin.grid(
             row=1,
-            column=3,
+            column=5,
             padx=5,
             pady=5
         )
+
+        # ---------------------------------------------------------
+        # TIPO / CATEGORÍA
+        # ---------------------------------------------------------
+
         tk.Label(
             filtros,
-            text="Hasta:"
-            ).grid(
-                row=1,
-                column=2,
-                padx=5,
-                pady=5
+            text="Tipo:"
+        ).grid(
+            row=2,
+            column=0,
+            padx=5,
+            pady=5
         )
+
+        # Las categorías se obtienen del catálogo para no limitarlas
+        # a EPP, DISCOS, SOLDADURA, etc.
+        materiales_tipo = reportes.obtener_materiales()
+        tipos = sorted({
+            material.categoria
+            for material in materiales_tipo
+            if material.categoria
+        })
+
+        self.filtro_tipo = ttk.Combobox(
+            filtros,
+            values=["Todos"] + tipos,
+            state="readonly",
+            width=18
+        )
+
+        self.filtro_tipo.grid(
+            row=2,
+            column=1,
+            padx=5,
+            pady=5
+        )
+
+        self.filtro_tipo.current(0)
 
         ttk.Button(
             filtros,
             text="Buscar",
             command=self.buscar_reportes
         ).grid(
-            row=1,
+            row=2,
             column=5,
             padx=10
         )
@@ -1508,36 +1788,85 @@ class App(tk.Tk):
         )
 
     def autocompletar_codigo_reporte(self, event=None):
+        # Las flechas/Enter/Escape se manejan por los bindings del autocomplete.
+        # No debemos reconstruir la lista al soltar esas teclas, porque eso
+        # reiniciaría la selección visual a la primera opción.
+        if event is not None and event.keysym in (
+            "Up", "Down", "Return", "Escape"
+        ):
+            return
+
 
         texto = self.filtro_codigo.get().strip().lower()
 
         if not texto:
-            resultados = self.materiales_filtro_codigo
-        else:
-            resultados = [
-                material
-                for material in self.materiales_filtro_codigo
-                if (
-                    texto in material.codigo.lower()
-                    or texto in material.descripcion.lower()
-                )
-            ]
+            self.cerrar_autocomplete()
+            return
 
-        self.filtro_codigo["values"] = [
+        resultados = [
+            material for material in self.materiales_filtro_codigo
+            if texto in material.codigo.lower()
+            or texto in material.descripcion.lower()
+        ]
+
+        opciones = [
             f"{material.codigo} - {material.descripcion}"
             for material in resultados
         ]
 
+        def seleccionar():
+            lista = self.autocomplete_listbox
+            i = lista.curselection()
+            if not i:
+                return
+            opcion = lista.get(i[0])
+            codigo = opcion.split(" - ", 1)[0].strip()
+            self.filtro_codigo.delete(0, tk.END)
+            self.filtro_codigo.insert(0, codigo)
+            self.cerrar_autocomplete()
 
-    def seleccionar_codigo_reporte(self, event=None):
+        self.mostrar_sugerencias(
+            self.filtro_codigo,
+            opciones,
+            seleccionar
+        )
 
-        texto = self.filtro_codigo.get().strip()
+    def autocompletar_lider_reporte(self, event=None):
 
-        if " - " in texto:
-            codigo = texto.split(" - ", 1)[0].strip()
+        # No procesar las teclas de navegación como texto.
+        if event is not None and event.keysym in (
+            "Up", "Down", "Return", "Escape"
+        ):
+            return
 
-            self.filtro_codigo.set(codigo)
+        texto = self.filtro_lider.get().strip().lower()
 
+        if not texto:
+            self.cerrar_autocomplete()
+            return
+
+        resultados = [
+            lider
+            for lider in self.lideres_filtro
+            if texto in lider.lower()
+        ]
+
+        def seleccionar():
+            lista = self.autocomplete_listbox
+            i = lista.curselection()
+            if not i:
+                return
+
+            lider = lista.get(i[0])
+            self.filtro_lider.delete(0, tk.END)
+            self.filtro_lider.insert(0, lider)
+            self.cerrar_autocomplete()
+
+        self.mostrar_sugerencias(
+            self.filtro_lider,
+            resultados,
+            seleccionar
+        )
 
     def buscar_reportes(self):
 
@@ -1575,13 +1904,37 @@ class App(tk.Tk):
                     "%Y-%m-%d"
                 ).date()
 
+            fabricacion = (
+                self.filtro_fabricacion.get()
+                or None
+            )
+
             registros = reportes.obtener_registros(
                 codigo=codigo,
                 solicitante=solicitante,
                 lider=lider,
+                fabricacion=fabricacion,
                 fecha_inicio=fecha_inicio,
                 fecha_fin=fecha_fin
             )
+
+            # Filtrar por Tipo/Categoría usando el catálogo de materiales.
+            # Se hace aquí para no tocar el funcionamiento existente de
+            # las búsquedas ni del autocomplete.
+            tipo = self.filtro_tipo.get().strip()
+
+            if tipo and tipo != "Todos":
+                materiales = reportes.obtener_materiales()
+                categorias_por_codigo = {
+                    material.codigo: material.categoria
+                    for material in materiales
+                }
+
+                registros = [
+                    registro
+                    for registro in registros
+                    if categorias_por_codigo.get(registro.codigo) == tipo
+                ]
 
             self.registros_actuales = registros
 

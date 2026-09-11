@@ -78,10 +78,15 @@ def buscar_materiales(texto):
     db = SessionLocal()
 
     try:
+        from sqlalchemy import or_
+
         resultados = (
             db.query(Material)
             .filter(
-                Material.descripcion.ilike(f"%{texto}%")
+                or_(
+                    Material.codigo.ilike(f"%{texto}%"),
+                    Material.descripcion.ilike(f"%{texto}%")
+                )
             )
             .order_by(Material.descripcion)
             .all()
@@ -189,6 +194,23 @@ def obtener_lideres():
             db.query(RelacionLiderSolicitante.lider)
             .distinct()
             .order_by(RelacionLiderSolicitante.lider)
+            .all()
+        )
+
+        return [resultado[0] for resultado in resultados]
+
+    finally:
+        db.close()
+
+
+def obtener_solicitantes():
+    db = SessionLocal()
+
+    try:
+        resultados = (
+            db.query(RelacionLiderSolicitante.solicitante)
+            .distinct()
+            .order_by(RelacionLiderSolicitante.solicitante)
             .all()
         )
 
